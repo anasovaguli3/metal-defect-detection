@@ -33,7 +33,7 @@ Full metrics: [test_metrics.json](results/metrics/test_metrics.json) · training
 ## Quick start
 
 ```bash
-git clone <repo-url> && cd CNN
+git clone https://github.com/anasovaguli3/metal-defect-detection.git && cd metal-defect-detection
 python -m venv .venv
 .venv\Scripts\activate          # Linux/macOS: source .venv/bin/activate
 pip install torch torchvision   # GPU: see https://pytorch.org/get-started/locally/
