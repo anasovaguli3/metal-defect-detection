@@ -1,0 +1,61 @@
+random_seed: 42
+
+data:
+  zip_path: data/data.zip
+  raw_images_dir: data/raw_images
+  label_csv: data/label.csv
+  processed_dir: data/processed
+  image_column: image
+  label_column: choice
+  classes:
+    - defect
+    - normal
+  duplicate_policy: drop_conflicting
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  image_size: 224
+
+augmentation:
+  horizontal_flip: true
+  rotation_degrees: 12
+  color_jitter:
+    brightness: 0.15
+    contrast: 0.15
+    saturation: 0.10
+  random_resized_crop: false
+
+training:
+  device: auto
+  batch_size: 16
+  learning_rate: 0.001
+  epochs: 25
+  dropout: 0.35
+  num_workers: 4
+  weight_decay: 0.0001
+  use_class_weights: true
+  scheduler: plateau
+  resume: false
+
+tuning:
+  batch_sizes: [8, 16]
+  epochs: 15
+  learning_rate: 0.001
+
+baseline:
+  model_name: efficientnet_b0
+  batch_size: 16
+  epochs: 20
+  learning_rate: 0.0005
+
+paths:
+  cnn_checkpoint: results/models/cnn_best.pth
+  cnn_history: results/metrics/training_history.json
+  test_metrics: results/metrics/test_metrics.json
+  confusion_matrix: results/plots/confusion_matrix.png
+  tuning_dir: results/tuning
+  tuning_comparison: results/tuning/comparison.csv
+  baseline_checkpoint: results/models/baseline_best.pth
+  baseline_comparison: results/baseline/comparison.csv
+  feature_maps_dir: results/feature_maps
+  logs_dir: results/logs
