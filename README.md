@@ -1,141 +1,126 @@
-# Metall nuqsoni aniqlash (CNN + baseline)
+# Metal Surface Defect Detection
 
-Ikki klassli tasvir tasnifi: `defect` va `normal`. Loyiha `data.zip` dan boshlanadi.
+A CNN-based binary image classifier that detects manufacturing defects on metal surfaces (`defect` vs `normal`), served as a REST API with FastAPI and packaged with Docker.
 
-## Talablar
+**93.4% test accuracy** on 1,093 held-out images · custom PyTorch CNN with ~423K parameters · full pipeline from raw data to deployed API.
 
-- Python 3.10+
-- NVIDIA GPU (ixtiyoriy, lekin tavsiya etiladi)
+> 🔗 **Live demo:** _coming soon on Hugging Face Spaces_
+> 📸 _demo GIF placeholder_
 
-## GPU o'rnatish (PyTorch + CUDA)
+## Results
 
-[R pytorch.org](https://pytorch.org/get-started/locally/) sahifasidan CUDA versiyangizga mos buyruqni oling. Masalan (CUDA 12.1):
+| Metric (test set, n=1093) | Score |
+|---------------------------|-------|
+| Accuracy                  | 93.4% |
+| Precision (weighted)      | 93.6% |
+| Recall (weighted)         | 93.4% |
+| F1 (weighted)             | 93.4% |
+| Recall on `defect` class  | 96.7% |
+
+High defect recall matters most in quality control: missing a defective part is more costly than a false alarm.
+
+![Confusion matrix](results/plots/confusion_matrix.png)
+
+Full metrics: [test_metrics.json](results/metrics/test_metrics.json) · training curves: [training_history.json](results/metrics/training_history.json)
+
+## How it works
+
+- **Data:** 7,284 JPEG images (300×300) with `defect`/`normal` labels; conflicting duplicate labels dropped during preparation; stratified 70/15/15 train/val/test split.
+- **Model:** custom CNN — 4 conv blocks (32→64→128→256 channels, BatchNorm + ReLU + MaxPool), global average pooling, 2-layer classifier head with dropout ([src/model.py](src/model.py)).
+- **Training:** Adam + ReduceLROnPlateau, class-weighted cross-entropy, augmentation (flips, rotation, color jitter), best-checkpoint saving with resume support ([src/trainer.py](src/trainer.py)).
+- **Serving:** FastAPI endpoint loads the checkpoint once at startup and returns class + confidence ([main.py](main.py)).
+
+## Quick start
 
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-```
-
-Tekshiruv:
-
-```bash
-python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
-```
-
-`config/settings.yaml` da `training.device: auto` — GPU bo'lsa CUDA, aks holda CPU.
-
-## O'rnatish (ustoz boshqa kompyuterda ham shu tartibda)
-
-Loyiha **Docker talab qilmaydi**. Ustoz o'z noutbukida faqat Python + `requirements.txt` bilan ishga tushiradi.
-
-```bash
-cd "AI assignment"
+git clone <repo-url> && cd CNN
 python -m venv .venv
-.venv\Scripts\activate
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+.venv\Scripts\activate          # Linux/macOS: source .venv/bin/activate
+pip install torch torchvision   # GPU: see https://pytorch.org/get-started/locally/
 pip install -r requirements.txt
 ```
 
-Tekshiruv (barcha kutubxonalar va fayllar):
+A trained checkpoint ships with the repo (`results/models/cnn_best.pth`), so inference works out of the box — no dataset or training needed.
+
+### REST API
 
 ```bash
-python scripts/verify_setup.py
+pip install -r requirements-api.txt
+uvicorn main:app --reload
 ```
-
-**Muhim:** `.venv` papkasini loyiha ichida qoldiring — har safar faqat `activate` qiling, qayta `pip install` shart emas. Yangi kompyuterga butun `AI assignment` papkasini (`.venv` siz ham bo'ladi) ko'chirib, yuqoridagi o'rnatishni bir marta bajaring.
-
-**Windows:** `DataLoader` xato bersa `config/settings.yaml` ichida `training.num_workers: 0` qiling.
-
-## Har kuni ishga tushirish (Streamlit)
-
-**Eng oson:** `run_app.bat` faylini ikki marta bosing. Hammasi.
-
-Yoki terminalda **bitta buyruq**:
-
-```powershell
-cd "C:\Users\anaso\Desktop\AI assignment"
-.\.venv\Scripts\python.exe scripts\run_app.py
-```
-
-`pip install` yoki `activate` **har safar shart emas** — faqat birinchi marta o'rnatilgan bo'lsa yetadi.
-
-## Birinchi marta (to'liq pipeline)
 
 ```bash
-python scripts/unpack_data.py
-python scripts/prepare_data.py
-python scripts/train.py
-python scripts/evaluate.py
-python scripts/run_tuning.py
-python scripts/train_baseline.py
+curl -X POST http://127.0.0.1:8000/predict -F "file=@some_image.jpeg"
+```
+
+```json
+{
+  "class": "defect",
+  "confidence": 0.9252,
+  "probabilities": { "defect": 0.9252, "normal": 0.0748 }
+}
+```
+
+Interactive Swagger docs at `http://127.0.0.1:8000/docs`.
+
+### Streamlit demo UI
+
+```bash
 python -m streamlit run app/app.py
 ```
 
-Yoki Windowsda ikki marta bosing: **`run_app.bat`**
+Upload an image and see the prediction, confidence and feature-map visualizations at `http://localhost:8501`.
 
-Brauzerda oching: **http://127.0.0.1:8501** (yoki http://localhost:8501)
+### Docker
 
-### localhost ishlamasa
-
-1. Terminalda xato bormi? Avval model borligini tekshiring: `results/models/cnn_best.pth`
-2. `streamlit` emas, shu buyruqni ishlating:
-   ```bash
-   python -m streamlit run app/app.py
-   ```
-3. Brauzerni qo'lda oching: `http://127.0.0.1:8501`
-4. Port band bo'lsa:
-   ```bash
-   python -m streamlit run app/app.py --server.port 8502
-   ```
-   keyin `http://127.0.0.1:8502`
-5. `.venv` yoqilganmi: `.venv\Scripts\activate`
-6. Streamlit o'rnatilmagan bo'lsa: `pip install streamlit`
-
-Tez sinov uchun `training.epochs` ni 3–5 ga tushirishingiz mumkin.
-
-### Qo'shimcha
-
-| Buyruq | Vazifa |
-|--------|--------|
-| `python scripts/train.py --resume` | CNN checkpointdan davom |
-| `python scripts/run_tuning.py --skip-trained` | Tuning natijalari bor bo'lsa qayta o'qitmaslik |
-| `python scripts/predict.py data/raw_images/img_00001.jpeg` | Bitta rasm |
-
-## Loyiha tuzilishi
-
-```
-config/settings.yaml
-data/          # zip, raw_images, label.csv, processed/
-src/           # pipeline, model, train, eval
-scripts/       # CLI
-app/app.py     # Streamlit
-notebooks/report.ipynb
-results/       # models, metrics, plots, tuning, baseline, feature_maps
+```bash
+docker build -t defect-api .
+docker run -p 7860:7860 defect-api
 ```
 
-## Checkpoint va tarix
+The image installs CPU-only PyTorch and serves the API on port 7860 (Hugging Face Spaces convention).
 
-- Eng yaxshi CNN: `results/models/cnn_best.pth`
-- Epoch tarixi: `results/metrics/training_history.json`
-- Resume: `python scripts/train.py --resume` yoki `training.resume: true`
+## Training from scratch
 
-## Ma'lumotlar
+Place `data.zip` in `data/`, then:
 
-- 7284 ta JPEG (300×300), `label.csv` ustunlari: `image`, `choice`
-- Ziddiyatli dublikat (`img_01490.jpeg`) `prepare_data` da olib tashlanadi
+```bash
+python scripts/unpack_data.py      # extract images + labels
+python scripts/prepare_data.py     # clean labels, create splits
+python scripts/train.py            # train CNN (--resume to continue)
+python scripts/evaluate.py         # test-set metrics + confusion matrix
+```
 
-## Notebook
+Optional: `scripts/run_tuning.py` (batch-size search), `scripts/train_baseline.py` (EfficientNet-B0 transfer-learning baseline). All hyperparameters live in [config/settings.yaml](config/settings.yaml).
 
-`notebooks/report.ipynb` — `RUN_TRAINING = False` bilan mavjud natijalarni ko'rsatadi (to'liq o'qitish shart emas).
+## Deploy to Hugging Face Spaces
 
-## cd "AI assignment"
-python -m venv .venv
-.venv\Scripts\activate
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements.txt
+1. Create a new Space → SDK: **Docker**.
+2. Add this to the top of the Space's `README.md`:
+   ```yaml
+   ---
+   title: Metal Defect Detection API
+   sdk: docker
+   app_port: 7860
+   ---
+   ```
+3. Push this repo to the Space:
+   ```bash
+   git remote add hf https://huggingface.co/spaces/<username>/<space-name>
+   git push hf main
+   ```
 
-python scripts/verify_setup.py
-python scripts/unpack_data.py
-python scripts/prepare_data.py
-python scripts/train.py
-python scripts/evaluate.py
-streamlit run app/app.py
+The free CPU tier is sufficient — the model is small (~1.7 MB of weights).
+
+## Project structure
+
+```
+├── main.py              # FastAPI inference service
+├── Dockerfile           # container for deployment (port 7860)
+├── config/settings.yaml # all paths & hyperparameters
+├── src/                 # model, data pipeline, trainer, evaluation, tuning
+├── scripts/             # CLI entry points (train / evaluate / predict / app)
+├── app/                 # Streamlit demo UI
+├── notebooks/           # exploratory report notebook
+└── results/             # trained model, metrics, plots, feature maps
+```
